@@ -1,0 +1,17 @@
+ALTER TABLE orders ADD COLUMN assigned_waiter_user_id uuid;
+ALTER TABLE orders ADD CONSTRAINT order_waiter_tenant FOREIGN KEY(tenant_id,assigned_waiter_user_id) REFERENCES users(tenant_id,id);
+CREATE INDEX orders_session_scope ON orders(tenant_id,branch_id,session_id);
+CREATE INDEX items_order_scope ON order_items(tenant_id,branch_id,order_id);
+CREATE INDEX payments_bill_scope ON payments(tenant_id,branch_id,bill_id);
+CREATE INDEX payments_document_scope ON payments(tenant_id,branch_id,document_id);
+CREATE INDEX ledger_account_scope ON journal_lines(tenant_id,branch_id,account_id);
+CREATE INDEX events_recovery ON events(tenant_id,branch_id,created_at DESC);
+CREATE FUNCTION immutable_bill_snapshot() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.snapshot IS DISTINCT FROM OLD.snapshot OR NEW.total<>OLD.total OR NEW.generated_by<>OLD.generated_by OR NEW.session_id<>OLD.session_id OR NEW.tenant_id<>OLD.tenant_id OR NEW.branch_id<>OLD.branch_id THEN RAISE EXCEPTION 'Finalized bill snapshot is immutable'; END IF; RETURN NEW; END $$;
+CREATE TRIGGER protect_bill_snapshot BEFORE UPDATE ON bills FOR EACH ROW EXECUTE FUNCTION immutable_bill_snapshot();
+CREATE FUNCTION immutable_payment_amount() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.amount<>OLD.amount OR NEW.direction<>OLD.direction OR NEW.account_id<>OLD.account_id OR NEW.received_by<>OLD.received_by OR NEW.bill_id IS DISTINCT FROM OLD.bill_id OR NEW.document_id IS DISTINCT FROM OLD.document_id OR NEW.tenant_id<>OLD.tenant_id OR NEW.branch_id<>OLD.branch_id OR OLD.status='verified' THEN RAISE EXCEPTION 'Posted payment is immutable'; END IF; RETURN NEW; END $$;
+CREATE TRIGGER protect_payment BEFORE UPDATE ON payments FOR EACH ROW EXECUTE FUNCTION immutable_payment_amount();
+CREATE TABLE platform_admins (id uuid PRIMARY KEY DEFAULT gen_random_uuid(),email text NOT NULL UNIQUE,name text NOT NULL,password_hash text NOT NULL,active boolean NOT NULL DEFAULT true,token_version integer NOT NULL DEFAULT 0);
+CREATE TABLE platform_audit (id uuid PRIMARY KEY DEFAULT gen_random_uuid(),actor_id uuid REFERENCES platform_admins(id),tenant_id uuid REFERENCES tenants(id),action text NOT NULL,reason text NOT NULL,data jsonb NOT NULL DEFAULT '{}',created_at timestamptz NOT NULL DEFAULT now());
+CREATE TRIGGER immutable_platform_audit BEFORE UPDATE OR DELETE ON platform_audit FOR EACH ROW EXECUTE FUNCTION immutable_posting();
+REVOKE ALL ON platform_admins,platform_audit FROM rms_app;
+REVOKE CREATE ON SCHEMA public FROM PUBLIC;

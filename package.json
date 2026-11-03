@@ -1,0 +1,28 @@
+{
+  "name": "aas-lab-rms",
+  "private": true,
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "dev:api": "npm run dev -w backend",
+    "dev:web": "npm run dev -w frontend",
+    "build": "npm run build -w frontend",
+    "test": "node backend/test/domain.test.mjs",
+    "test:integration": "npm run test:integration -w backend",
+    "migrate": "npm run migrate -w backend",
+    "seed": "npm run seed -w backend",
+    "setup": "node scripts/setup.mjs",
+    "check": "node scripts/check.mjs",
+    "test:browser": "node scripts/browser-smoke.mjs",
+    "test:http": "node scripts/http-security.mjs",
+    "test:platform": "node scripts/platform-smoke.mjs",
+    "format": "prettier --write \"backend/**/*.mjs\" \"frontend/src/*.js\" \"frontend/src/*.css\" \"scripts/*.mjs\" \"docs/*.md\" README.md",
+    "format:check": "prettier --check \"backend/**/*.mjs\" \"frontend/src/*.js\" \"frontend/src/*.css\" \"scripts/*.mjs\" \"docs/*.md\" README.md"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.64.1",
+    "prettier": "^3.9.10"
+  }
+}

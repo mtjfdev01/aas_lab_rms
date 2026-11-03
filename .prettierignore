@@ -1,0 +1,6 @@
+node_modules
+frontend/dist
+package-lock.json
+.env
+uploads
+*.sql

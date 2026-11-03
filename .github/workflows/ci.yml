@@ -1,0 +1,35 @@
+name: Validate restaurant SaaS
+on: [push, pull_request]
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: rms_owner
+          POSTGRES_PASSWORD: local_owner_password
+          POSTGRES_DB: rms
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U rms_owner -d rms"
+          --health-interval 3s --health-timeout 5s --health-retries 20
+    env:
+      DATABASE_URL: postgresql://rms_app:local_app_password@localhost:5432/rms
+      MIGRATION_DATABASE_URL: postgresql://rms_owner:local_owner_password@localhost:5432/rms
+      JWT_SECRET: CI-only-random-looking-signing-key-never-use-for-production-2026
+      DEMO_PASSWORD: CI-only-development-password-2026
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: psql "$MIGRATION_DATABASE_URL" -v ON_ERROR_STOP=1 -f scripts/init-db.sql
+      - run: npm run migrate
+      - run: npm run seed
+      - run: npm run check
+      - run: npm test
+      - run: npm run test:integration
+      - run: npm run build
